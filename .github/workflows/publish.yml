@@ -1,0 +1,61 @@
+name: Publish to PyPI
+
+# Publishes the package to PyPI whenever a version tag (e.g. v0.1.0) is pushed.
+# Uses PyPI Trusted Publishing (OIDC) — no API token secret required.
+# One-time setup on PyPI: https://pypi.org/manage/account/publishing/
+#   PyPI project name: langchain-goodsender
+#   Owner: good-sender   Repository: langchain-goodsender
+#   Workflow: publish.yml   Environment: pypi
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[test]"
+      - run: pytest tests/unit_tests/ -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify tag matches pyproject version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          echo "tag=$TAG  pyproject=$PKG"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag v$TAG does not match pyproject version $PKG — bump version in pyproject.toml or fix the tag."
+            exit 1
+          fi
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
