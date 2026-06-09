@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "langchain-goodsender"
-version = "0.1.0"
+version = "0.1.1"
 description = "LangChain integration for GoodSender — transactional email API with consent management"
 readme = "README.md"
 license = "MIT"
